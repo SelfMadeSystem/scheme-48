@@ -263,11 +263,9 @@ eval val@(Char _) = val
 eval val@(Error _) = val
 eval (List [Atom "quote", val]) = val
 eval (List [Atom "if", predi, conseq, alt]) =
-  do
-    let result = eval predi
-    case result of
-      Bool False -> eval alt
-      _ -> eval conseq
+  case eval predi of
+    Bool False -> eval alt
+    _ -> eval conseq
 eval (List (Atom "cond" : clauses)) = cond clauses
 eval (List (Atom "case" : expr : clauses)) = case' (eval expr) clauses
 eval (List (Atom "and" : args)) = and' args

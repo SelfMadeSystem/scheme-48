@@ -196,6 +196,12 @@ primitives =
 apply :: String -> [LispVal] -> LispVal
 apply func args = maybe (Error $ NotFunction "Unrecognized primitive function args" func) ($ args) $ lookup func primitives
 
+-- | Helper function to check if a value is truthy or falsy
+isTruthy :: LispVal -> Bool
+isTruthy (Bool False) = False
+isTruthy (Error _) = False -- TODO: Handle errors properly
+isTruthy _ = True
+
 -- | cond is of the form (cond (clause1) (clause2) ... (clauseN)) where each
 -- clause is of the form (predicate body1 body2 ... bodyN). The first clause
 -- whose predicate evaluates to true is the one that gets executed. The last
@@ -217,6 +223,38 @@ cond (List (predi : body) : rest) = case eval predi of
   _ -> last $ map eval body
 cond badArgList = Error $ BadSpecialForm "Invalid cond clause" $ List badArgList
 
+-- | case is of the form (case expr (clause1) (clause2) ... (clauseN)) where each
+-- clause is of the form ((datum1 datum2 ... datumN) body1 body2 ... bodyN). The
+-- first clause whose datums match the value of expr (using eqv?) is the one that
+-- gets executed. The last clause may be of the form (else body1 body2 ... bodyN)
+-- and it will always evaluate to true.
+--
+-- Note: does not evaluate the datums.
+case' :: LispVal -> [LispVal] -> LispVal
+case' _ [] = Error $ Default "No true clause found"
+case' _ (List [Atom "else"] : _) = Atom "else"
+case' _ (List (Atom "else" : body) : _) = last $ map eval body
+case' expr (List (List datums : body) : rest) = if any (\datum -> isTruthy $ eqv [expr, datum]) datums then last $ map eval body else case' expr rest
+case' _ badArgList = Error $ BadSpecialForm "Invalid case clause" $ List badArgList
+
+-- | and is a special form that evaluates to the first false value or the last
+-- value if all values are true
+and' :: [LispVal] -> LispVal
+and' [] = Bool True
+and' [x] = eval x
+and' (x : xs) =
+  let result = eval x
+   in if isTruthy result then and' xs else result
+
+-- | or is a special form that evaluates to the first true value or the last
+-- value if all values are false
+or' :: [LispVal] -> LispVal
+or' [] = Bool False
+or' [x] = eval x
+or' (x : xs) =
+  let result = eval x
+   in if isTruthy result then result else or' xs
+
 eval :: LispVal -> LispVal
 eval val@(String _) = val
 eval val@(Number _) = val
@@ -231,5 +269,8 @@ eval (List [Atom "if", predi, conseq, alt]) =
       Bool False -> eval alt
       _ -> eval conseq
 eval (List (Atom "cond" : clauses)) = cond clauses
+eval (List (Atom "case" : expr : clauses)) = case' (eval expr) clauses
+eval (List (Atom "and" : args)) = and' args
+eval (List (Atom "or" : args)) = or' args
 eval (List (Atom func : args)) = apply func $ map eval args
 eval badForm = Error $ BadSpecialForm "Unrecognized special form" badForm

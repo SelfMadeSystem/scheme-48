@@ -5,7 +5,7 @@ Haskell. It is based on the book "Write Yourself a Scheme in 48 Hours" by
 Jonathan Tang.
 
 Because I like the way zig handles errors, I decided to implement the error
-handling in a similar way. This means that the errors are a value that can be
+handling in a similar way. This means that the errors are values that can be
 returned from a function, and the caller can decide what to do with it.
 
 ## Building

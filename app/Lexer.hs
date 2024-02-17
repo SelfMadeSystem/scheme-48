@@ -2,32 +2,7 @@ module Lexer (LispVal, parseExpr, readExpr) where
 
 import Data.Maybe (fromMaybe)
 import Text.ParserCombinators.Parsec hiding (spaces)
-
--- | LispVal data type for representing Lisp values
-data LispVal
-  = Atom String
-  | List [LispVal]
-  | DottedList [LispVal] LispVal
-  | Number Integer
-  | String String
-  | Char Char
-  | Bool Bool
-
-instance Show LispVal where
-  show (Atom name) = name
-  show (List xs) = "(" ++ unwords (map show xs) ++ ")"
-  show (DottedList h t) = "(" ++ unwords (map show h) ++ " . " ++ show t ++ ")"
-  show (Number num) = show num
-  show (String str) = show str
-  show (Char c) =
-    "#\\" ++ case c of
-      ' ' -> "space"
-      '\n' -> "newline"
-      '\t' -> "tab"
-      '\r' -> "return"
-      _ -> [c]
-  show (Bool True) = "#t"
-  show (Bool False) = "#f"
+import Types
 
 -- | Parses one or more spaces
 spaces :: Parser ()
@@ -124,8 +99,8 @@ parseNumber = do
   return $ Number number
 
 -- | Parses the dot, space and the expression that follows it for a dotted list.
-parseDot :: Parser LispVal
-parseDot = do
+parseListDot :: Parser LispVal
+parseListDot = do
   _ <- char '.'
   spaces
   parseExpr
@@ -136,7 +111,7 @@ parseDot = do
 parseList :: Parser LispVal
 parseList = do
   h <- sepEndBy parseExpr spaces
-  t <- optionMaybe $ try parseDot
+  t <- optionMaybe $ try parseListDot
   return $ case t of
     Nothing -> List h
     Just x -> DottedList h x
@@ -160,7 +135,7 @@ parseExpr =
       _ <- char ')'
       return x
 
-readExpr :: String -> String
+readExpr :: String -> LispVal
 readExpr input = case parse parseExpr "lisp" input of
-  Left err -> "No match: " ++ show err
-  Right val -> "Found value: " ++ show val
+  Left err -> String $ "No match: " ++ show err
+  Right val -> val

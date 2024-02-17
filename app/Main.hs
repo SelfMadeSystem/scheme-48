@@ -1,9 +1,8 @@
 module Main (main) where
 
+import Evaluator
 import Lexer
 import System.Environment
 
 main :: IO ()
-main = do
-  (expr : _) <- getArgs
-  putStrLn (readExpr expr)
+main = getArgs >>= print . eval . readExpr . head

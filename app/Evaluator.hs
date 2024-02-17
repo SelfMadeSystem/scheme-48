@@ -211,17 +211,21 @@ isTruthy _ = True
 -- The standard states that "If all <test>s evaluate to false values, and there
 -- is no else clause, then the result of the conditional expression is
 -- unspecified", so I'm going to return an error in that case.
-cond :: [LispVal] -> LispVal
-cond [] = Error $ Default "No true clause found"
-cond (List [Atom "else"] : _) = Atom "else"
-cond (List (Atom "else" : body) : _) = last $ map eval body
-cond (List [predi] : rest) = case eval predi of
-  Bool False -> cond rest
-  _ -> predi
-cond (List (predi : body) : rest) = case eval predi of
-  Bool False -> cond rest
-  _ -> last $ map eval body
-cond badArgList = Error $ BadSpecialForm "Invalid cond clause" $ List badArgList
+cond :: Env -> [LispVal] -> IO LispVal
+cond _ [] = return $ Error $ Default "No true clause found"
+cond _ (List [Atom "else"] : _) = return $ Atom "else"
+cond env (List (Atom "else" : body) : _) = last $ map (eval env) body
+cond env (List [predi] : rest) = do
+  result <- eval env predi
+  case result of
+    Bool False -> cond env rest
+    _ -> return result
+cond env (List (predi : body) : rest) = do
+  result <- eval env predi
+  case result of
+    Bool False -> cond env rest
+    _ -> last $ map (eval env) body
+cond _ badArgList = return $ Error $ BadSpecialForm "Invalid cond clause" $ List badArgList
 
 -- | case is of the form (case expr (clause1) (clause2) ... (clauseN)) where each
 -- clause is of the form ((datum1 datum2 ... datumN) body1 body2 ... bodyN). The
@@ -230,45 +234,53 @@ cond badArgList = Error $ BadSpecialForm "Invalid cond clause" $ List badArgList
 -- and it will always evaluate to true.
 --
 -- Note: does not evaluate the datums.
-case' :: LispVal -> [LispVal] -> LispVal
-case' _ [] = Error $ Default "No true clause found"
-case' _ (List [Atom "else"] : _) = Atom "else"
-case' _ (List (Atom "else" : body) : _) = last $ map eval body
-case' expr (List (List datums : body) : rest) = if any (\datum -> isTruthy $ eqv [expr, datum]) datums then last $ map eval body else case' expr rest
-case' _ badArgList = Error $ BadSpecialForm "Invalid case clause" $ List badArgList
+case' :: Env -> LispVal -> [LispVal] -> IO LispVal
+case' _ _ [] = return $ Error $ Default "No true clause found"
+case' _ _ (List [Atom "else"] : _) = return $ Atom "else"
+case' env _ (List (Atom "else" : body) : _) = last $ map (eval env) body
+case' env expr (List (List datums : body) : rest) = if any (\datum -> isTruthy $ eqv [expr, datum]) datums then last $ map (eval env) body else case' env expr rest
+case' _ _ badArgList = return $ Error $ BadSpecialForm "Invalid case clause" $ List badArgList
 
 -- | and is a special form that evaluates to the first false value or the last
 -- value if all values are true
-and' :: [LispVal] -> LispVal
-and' [] = Bool True
-and' [x] = eval x
-and' (x : xs) =
-  let result = eval x
-   in if isTruthy result then and' xs else result
+and' :: Env -> [LispVal] -> IO LispVal
+and' _ [] = return $ Bool True
+and' env [x] = eval env x
+and' env (x : xs) = do
+  result <- eval env x
+  if isTruthy result then and' env xs else return result
 
 -- | or is a special form that evaluates to the first true value or the last
 -- value if all values are false
-or' :: [LispVal] -> LispVal
-or' [] = Bool False
-or' [x] = eval x
-or' (x : xs) =
-  let result = eval x
-   in if isTruthy result then result else or' xs
+or' :: Env -> [LispVal] -> IO LispVal
+or' _ [] = return $ Bool False
+or' env [x] = eval env x
+or' env (x : xs) = do
+  result <- eval env x
+  if isTruthy result then return result else or' env xs
 
-eval :: LispVal -> LispVal
-eval val@(String _) = val
-eval val@(Number _) = val
-eval val@(Bool _) = val
-eval val@(Char _) = val
-eval val@(Error _) = val
-eval (List [Atom "quote", val]) = val
-eval (List [Atom "if", predi, conseq, alt]) =
-  case eval predi of
-    Bool False -> eval alt
-    _ -> eval conseq
-eval (List (Atom "cond" : clauses)) = cond clauses
-eval (List (Atom "case" : expr : clauses)) = case' (eval expr) clauses
-eval (List (Atom "and" : args)) = and' args
-eval (List (Atom "or" : args)) = or' args
-eval (List (Atom func : args)) = apply func $ map eval args
-eval badForm = Error $ BadSpecialForm "Unrecognized special form" badForm
+eval :: Env -> LispVal -> IO LispVal
+eval _ val@(String _) = return val
+eval _ val@(Number _) = return val
+eval _ val@(Bool _) = return val
+eval _ val@(Char _) = return val
+eval _ val@(Error _) = return val
+eval env (Atom ident) = getVar env ident
+eval _ (List [Atom "quote", val]) = return val
+eval env (List [Atom "if", predi, conseq, alt]) = do
+  result <- eval env predi
+  case result of
+    Bool False -> eval env alt
+    _ -> eval env conseq
+eval env (List (Atom "cond" : clauses)) = cond env clauses
+eval env (List (Atom "case" : expr : clauses)) = do
+  expr' <- eval env expr
+  case' env expr' clauses
+eval env (List (Atom "and" : args)) = and' env args
+eval env (List (Atom "or" : args)) = or' env args
+eval env (List (Atom "set!" : [Atom var, form])) = eval env form >>= setVar env var
+eval env (List [Atom "define", Atom var, form]) = eval env form >>= defineVar env var
+eval env (List (Atom func : args)) = do
+  argVals <- mapM (eval env) args
+  return $ apply func argVals
+eval _ badForm = return $ Error $ BadSpecialForm "Unrecognized special form" badForm

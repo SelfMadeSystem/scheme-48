@@ -1,5 +1,8 @@
 module Types where
 
+import Data.Functor
+import Data.IORef
+import Data.Maybe
 import Text.Parsec (ParseError)
 
 -- | LispError data type for representing Lisp errors
@@ -62,3 +65,46 @@ showError (Default message) = message
 
 instance Show LispError where
   show = showError
+
+type Env = IORef [(String, IORef LispVal)]
+
+nullEnv :: IO Env
+nullEnv = newIORef []
+
+isBound :: Env -> String -> IO Bool
+isBound envRef var = readIORef envRef <&> (isJust . lookup var)
+
+getVar :: Env -> String -> IO LispVal
+getVar envRef var = do
+  env <- readIORef envRef
+  maybe
+    (return $ Error $ UnboundVar "Getting an unbound variable" var)
+    readIORef
+    (lookup var env)
+
+setVar :: Env -> String -> LispVal -> IO LispVal
+setVar envRef var value = do
+  env <- readIORef envRef
+  maybe
+    (return $ Error $ UnboundVar "Setting an unbound variable" var)
+    (\ref -> writeIORef ref value >> return value)
+    (lookup var env)
+
+defineVar :: Env -> String -> LispVal -> IO LispVal
+defineVar envRef var value = do
+  alreadyDefined <- isBound envRef var
+  if alreadyDefined
+    then setVar envRef var value $> value
+    else do
+      valueRef <- newIORef value
+      env <- readIORef envRef
+      writeIORef envRef ((var, valueRef) : env)
+      return value
+
+bindVars :: Env -> [(String, LispVal)] -> IO Env
+bindVars envRef bindings = readIORef envRef >>= extendEnv bindings >>= newIORef
+  where
+    extendEnv bindings' env = fmap (++ env) (mapM addBinding bindings')
+    addBinding (var, value) = do
+      ref <- newIORef value
+      return (var, ref)

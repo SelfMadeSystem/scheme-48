@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Evaluator (eval) where
 
 import Types
@@ -50,6 +52,68 @@ boolBoolBinop = boolBinop unpackBool
 
 strBoolBinop :: (String -> String -> Bool) -> [LispVal] -> LispVal
 strBoolBinop = boolBinop unpackStr
+
+-- | Helper function to check if a value is of a certain type
+isType :: (LispVal -> Bool) -> [LispVal] -> LispVal
+isType _ [] = Error $ NumArgs 1 []
+isType f [x] = Bool $ f x
+isType _ args = Error $ NumArgs 1 args
+
+isBool :: [LispVal] -> LispVal
+isBool =
+  isType
+    ( \case
+        Bool _ -> True
+        _ -> False
+    )
+
+isSymbol :: [LispVal] -> LispVal
+isSymbol =
+  isType
+    ( \case
+        Atom _ -> True
+        _ -> False
+    )
+
+isString :: [LispVal] -> LispVal
+isString =
+  isType
+    ( \case
+        String _ -> True
+        _ -> False
+    )
+
+isNumber :: [LispVal] -> LispVal
+isNumber =
+  isType
+    ( \case
+        Number _ -> True
+        _ -> False
+    )
+
+isChar :: [LispVal] -> LispVal
+isChar =
+  isType
+    ( \case
+        Char _ -> True
+        _ -> False
+    )
+
+isList :: [LispVal] -> LispVal
+isList =
+  isType
+    ( \case
+        List _ -> True
+        _ -> False
+    )
+
+isDottedList :: [LispVal] -> LispVal
+isDottedList =
+  isType
+    ( \case
+        DottedList _ _ -> True
+        _ -> False
+    )
 
 -- | car is equivalent to head in Haskell
 car :: [LispVal] -> LispVal
@@ -113,6 +177,13 @@ primitives =
     ("string>?", strBoolBinop (>)),
     ("string<=?", strBoolBinop (<=)),
     ("string>=?", strBoolBinop (>=)),
+    ("symbol?", isSymbol),
+    ("string?", isString),
+    ("number?", isNumber),
+    ("char?", isChar),
+    ("bool?", isBool),
+    ("list?", isList),
+    ("dotted-list?", isDottedList),
     ("car", car),
     ("cdr", cdr),
     ("cons", cons),
@@ -121,8 +192,30 @@ primitives =
     ("equal?", eqv)
   ]
 
+-- | Helper function to apply a function to a list of arguments
 apply :: String -> [LispVal] -> LispVal
 apply func args = maybe (Error $ NotFunction "Unrecognized primitive function args" func) ($ args) $ lookup func primitives
+
+-- | cond is of the form (cond (clause1) (clause2) ... (clauseN)) where each
+-- clause is of the form (predicate body1 body2 ... bodyN). The first clause
+-- whose predicate evaluates to true is the one that gets executed. The last
+-- clause may be of the form (else body1 body2 ... bodyN) and it will always
+-- evaluate to true.
+--
+-- The standard states that "If all <test>s evaluate to false values, and there
+-- is no else clause, then the result of the conditional expression is
+-- unspecified", so I'm going to return an error in that case.
+cond :: [LispVal] -> LispVal
+cond [] = Error $ Default "No true clause found"
+cond (List [Atom "else"] : _) = Atom "else"
+cond (List (Atom "else" : body) : _) = last $ map eval body
+cond (List [predi] : rest) = case eval predi of
+  Bool False -> cond rest
+  _ -> predi
+cond (List (predi : body) : rest) = case eval predi of
+  Bool False -> cond rest
+  _ -> last $ map eval body
+cond badArgList = Error $ BadSpecialForm "Invalid cond clause" $ List badArgList
 
 eval :: LispVal -> LispVal
 eval val@(String _) = val
@@ -137,5 +230,6 @@ eval (List [Atom "if", predi, conseq, alt]) =
     case result of
       Bool False -> eval alt
       _ -> eval conseq
+eval (List (Atom "cond" : clauses)) = cond clauses
 eval (List (Atom func : args)) = apply func $ map eval args
 eval badForm = Error $ BadSpecialForm "Unrecognized special form" badForm

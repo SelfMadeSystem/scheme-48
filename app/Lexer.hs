@@ -3,6 +3,7 @@ module Lexer (LispVal, parseExpr, readExpr) where
 import Data.Maybe (fromMaybe)
 import Text.ParserCombinators.Parsec hiding (spaces)
 import Types
+import Data.Functor
 
 -- | Parses one or more spaces
 spaces :: Parser ()
@@ -65,7 +66,7 @@ parseString = do
 parseChar :: Parser LispVal
 parseChar = do
   _ <- string "#\\"
-  c <- try (choice (map string specialChars)) <|> many1 (noneOf " ")
+  c <- try (choice (map string specialChars)) <|> (anyChar <&> (:[]))
   return $ Char $ fromMaybe (head c) (lookup c charMap)
   where
     charMap = [("space", ' '), ("newline", '\n'), ("tab", '\t'), ("return", '\r')]
@@ -137,5 +138,5 @@ parseExpr =
 
 readExpr :: String -> LispVal
 readExpr input = case parse parseExpr "lisp" input of
-  Left err -> String $ "No match: " ++ show err
+  Left err -> Error $ Parser err
   Right val -> val

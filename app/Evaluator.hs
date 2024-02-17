@@ -44,10 +44,52 @@ boolBinop unpacker op args =
 
 numBoolBinop :: (Integer -> Integer -> Bool) -> [LispVal] -> LispVal
 numBoolBinop = boolBinop unpackNum
+
 boolBoolBinop :: (Bool -> Bool -> Bool) -> [LispVal] -> LispVal
 boolBoolBinop = boolBinop unpackBool
+
 strBoolBinop :: (String -> String -> Bool) -> [LispVal] -> LispVal
 strBoolBinop = boolBinop unpackStr
+
+-- | car is equivalent to head in Haskell
+car :: [LispVal] -> LispVal
+car [List (x : _)] = x
+car [DottedList (x : _) _] = x
+car [badArg] = Error $ TypeMismatch "pair" badArg
+car badArgList = Error $ NumArgs 1 badArgList
+
+-- | cdr is equivalent to tail in Haskell
+cdr :: [LispVal] -> LispVal
+cdr [List (_ : xs)] = List xs
+cdr [DottedList [_] x] = x
+cdr [DottedList (_ : xs) x] = DottedList xs x
+cdr [badArg] = Error $ TypeMismatch "pair" badArg
+cdr badArgList = Error $ NumArgs 1 badArgList
+
+-- | cons is equivalent to (:) in Haskell
+cons :: [LispVal] -> LispVal
+cons [x, List xs] = List $ x : xs
+cons [x, DottedList xs xlast] = DottedList (x : xs) xlast
+cons [x1, x2] = DottedList [x1] x2
+cons badArgList = Error $ NumArgs 2 badArgList
+
+-- | eqv? is equivalent to (==) in Haskell. We're using it for the eq?, eqv? and
+-- equal? functions. The tutorial tells me to use make equal? check for weak
+-- equality, but I don't like weak typing, so I said no :).
+eqv :: [LispVal] -> LispVal
+eqv [Bool arg1, Bool arg2] = Bool $ arg1 == arg2
+eqv [Number arg1, Number arg2] = Bool $ arg1 == arg2
+eqv [String arg1, String arg2] = Bool $ arg1 == arg2
+eqv [Atom arg1, Atom arg2] = Bool $ arg1 == arg2
+eqv [Char arg1, Char arg2] = Bool $ arg1 == arg2
+eqv [DottedList xs x, DottedList ys y] = eqv [List $ xs ++ [x], List $ ys ++ [y]]
+eqv [List arg1, List arg2] = Bool $ (length arg1 == length arg2) && all eqvPair (zip arg1 arg2)
+  where
+    eqvPair (x1, x2) = case eqv [x1, x2] of
+      Bool val -> val
+      _ -> False
+eqv [_, _] = Bool False
+eqv badArgList = Error $ NumArgs 2 badArgList
 
 primitives :: [(String, [LispVal] -> LispVal)]
 primitives =
@@ -70,7 +112,13 @@ primitives =
     ("string<?", strBoolBinop (<)),
     ("string>?", strBoolBinop (>)),
     ("string<=?", strBoolBinop (<=)),
-    ("string>=?", strBoolBinop (>=))
+    ("string>=?", strBoolBinop (>=)),
+    ("car", car),
+    ("cdr", cdr),
+    ("cons", cons),
+    ("eq?", eqv),
+    ("eqv?", eqv),
+    ("equal?", eqv)
   ]
 
 apply :: String -> [LispVal] -> LispVal

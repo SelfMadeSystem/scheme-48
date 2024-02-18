@@ -11,7 +11,7 @@ data LispError
   | TypeMismatch String LispVal
   | Parser ParseError
   | BadSpecialForm String LispVal
-  | NotFunction String String
+  | NotFunction String LispVal
   | UnboundVar String String
   | Default String
 
@@ -28,6 +28,13 @@ data LispVal
   | Char Char
   | Bool Bool
   | Error LispError
+  | PrimitiveFunc ([LispVal] -> LispVal)
+  | Func
+      { params :: [String],
+        vararg :: Maybe String,
+        body :: [LispVal],
+        closure :: Env
+      }
 
 instance Show LispVal where
   show (Atom name) = name
@@ -45,6 +52,15 @@ instance Show LispVal where
   show (Bool True) = "#t"
   show (Bool False) = "#f"
   show (Error err) = showError err
+  show (PrimitiveFunc _) = "<primitive>"
+  show (Func {params = args, vararg = varargs, body = _, closure = _}) =
+    "(lambda ("
+      ++ unwords (map show args)
+      ++ ( case varargs of
+             Nothing -> ""
+             Just arg -> " . " ++ arg
+         )
+      ++ ") ...)"
 
 showError :: LispError -> String
 showError (UnboundVar message varname) = message ++ ": " ++ varname

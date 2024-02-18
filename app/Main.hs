@@ -1,10 +1,16 @@
 module Main (main) where
 
 import Evaluator
+import Functions (primitives)
 import Lexer
 import System.Environment
 import System.IO
 import Types
+
+primitiveBindings :: IO Env
+primitiveBindings = nullEnv >>= flip bindVars (map makePrimitiveFunc primitives)
+  where
+    makePrimitiveFunc (var, func) = (var, PrimitiveFunc func)
 
 flushStr :: String -> IO ()
 flushStr str = putStr str >> hFlush stdout
@@ -28,10 +34,10 @@ until_ predicate prompt action = do
     else action result >> until_ predicate prompt action
 
 runOne :: String -> IO ()
-runOne expr = nullEnv >>= flip evalAndPrint expr
+runOne expr = primitiveBindings >>= flip evalAndPrint expr
 
 runRepl :: IO ()
-runRepl = nullEnv >>= until_ (== "quit") (readPrompt "Lisp>>> ") . evalAndPrint
+runRepl = primitiveBindings >>= until_ (== "quit") (readPrompt "Lisp>>> ") . evalAndPrint
 
 main :: IO ()
 main = do

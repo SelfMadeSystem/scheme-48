@@ -64,6 +64,7 @@ executable scheme-test
     other-modules:    Lexer
                       , Evaluator
                       , Types
+                      , Functions
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:

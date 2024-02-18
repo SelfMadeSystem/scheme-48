@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-module Functions where
+module Functions (primitives, eqv) where
 
 import Types hiding (body, closure, params, vararg)
 

@@ -1,4 +1,4 @@
-module Evaluator (eval) where
+module Evaluator (eval, apply) where
 
 import Data.Maybe (isNothing)
 import Functions
@@ -7,6 +7,7 @@ import Types hiding (body, closure, params, vararg)
 -- | Helper function to apply a function to a list of arguments
 apply :: LispVal -> [LispVal] -> IO LispVal
 apply (PrimitiveFunc func) args = return $ func args
+apply (IOFunc func) args = func args
 apply (Func params vararg body closure) args =
   if num params /= num args && isNothing vararg || num args < num params
     then return $ Error $ NumArgs (num params) args

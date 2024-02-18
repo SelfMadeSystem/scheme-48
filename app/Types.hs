@@ -4,6 +4,7 @@ import Data.Functor
 import Data.IORef
 import Data.Maybe
 import Text.Parsec (ParseError)
+import GHC.IO.Handle
 
 -- | LispError data type for representing Lisp errors
 data LispError
@@ -27,8 +28,10 @@ data LispVal
   | String String
   | Char Char
   | Bool Bool
+  | Port Handle
   | Error LispError
   | PrimitiveFunc ([LispVal] -> LispVal)
+  | IOFunc ([LispVal] -> IO LispVal)
   | Func
       { params :: [String],
         vararg :: Maybe String,
@@ -51,8 +54,10 @@ instance Show LispVal where
       _ -> [c]
   show (Bool True) = "#t"
   show (Bool False) = "#f"
+  show (Port _) = "<IO port>"
   show (Error err) = showError err
   show (PrimitiveFunc _) = "<primitive>"
+  show (IOFunc _) = "<IO primitive>"
   show (Func {params = args, vararg = varargs, body = _, closure = _}) =
     "(lambda ("
       ++ unwords (map show args)

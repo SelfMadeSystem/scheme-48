@@ -65,6 +65,7 @@ executable scheme-test
                       , Evaluator
                       , Types
                       , Functions
+                      , IOFunctions
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:

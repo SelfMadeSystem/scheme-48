@@ -1,16 +1,17 @@
 module Main (main) where
 
 import Evaluator
-import Functions (primitives)
+import Functions
+import IOFunctions
 import Lexer
 import System.Environment
 import System.IO
 import Types
 
 primitiveBindings :: IO Env
-primitiveBindings = nullEnv >>= flip bindVars (map makePrimitiveFunc primitives)
+primitiveBindings = nullEnv >>= flip bindVars (map (makeFunc IOFunc) ioPrimitives ++ map (makeFunc PrimitiveFunc) primitives)
   where
-    makePrimitiveFunc (var, func) = (var, PrimitiveFunc func)
+    makeFunc constructor (var, func) = (var, constructor func)
 
 flushStr :: String -> IO ()
 flushStr str = putStr str >> hFlush stdout

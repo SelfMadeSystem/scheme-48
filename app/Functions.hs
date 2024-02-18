@@ -115,6 +115,14 @@ isDottedList =
         _ -> False
     )
 
+isError :: [LispVal] -> LispVal
+isError =
+  isType
+    ( \case
+        Error _ -> True
+        _ -> False
+    )
+
 -- | car is equivalent to head in Haskell
 car :: [LispVal] -> LispVal
 car [List (x : _)] = x
@@ -184,6 +192,7 @@ primitives =
     ("bool?", isBool),
     ("list?", isList),
     ("dotted-list?", isDottedList),
+    ("error?", isError),
     ("car", car),
     ("cdr", cdr),
     ("cons", cons),

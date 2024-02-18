@@ -32,6 +32,9 @@ data LispVal
   | Error LispError
   | PrimitiveFunc ([LispVal] -> LispVal)
   | IOFunc ([LispVal] -> IO LispVal)
+  -- | BuiltInFunc is a type for representing special forms and built-in functions
+  -- that need access to the environment. e.g. if, cond, define, load, etc.
+  | BuiltInFunc (Env -> [LispVal] -> IO LispVal)
   | Func
       { params :: [String],
         vararg :: Maybe String,
@@ -58,6 +61,7 @@ instance Show LispVal where
   show (Error err) = showError err
   show (PrimitiveFunc _) = "<primitive>"
   show (IOFunc _) = "<IO primitive>"
+  show (BuiltInFunc _) = "<built-in>"
   show (Func {params = args, vararg = varargs, body = _, closure = _}) =
     "(lambda ("
       ++ unwords (map show args)

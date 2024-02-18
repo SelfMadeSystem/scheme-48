@@ -1,5 +1,6 @@
 module Main (main) where
 
+import BuiltInFunctions
 import Evaluator
 import Functions
 import IOFunctions
@@ -9,7 +10,14 @@ import System.IO
 import Types
 
 primitiveBindings :: IO Env
-primitiveBindings = nullEnv >>= flip bindVars (map (makeFunc IOFunc) ioPrimitives ++ map (makeFunc PrimitiveFunc) primitives)
+primitiveBindings =
+  nullEnv
+    >>= flip
+      bindVars
+      ( map (makeFunc IOFunc) ioPrimitives
+          ++ map (makeFunc PrimitiveFunc) primitives
+          ++ map (makeFunc BuiltInFunc) builtInsPrimitives
+      )
   where
     makeFunc constructor (var, func) = (var, constructor func)
 
@@ -34,8 +42,10 @@ until_ predicate prompt action = do
     then return ()
     else action result >> until_ predicate prompt action
 
-runOne :: String -> IO ()
-runOne expr = primitiveBindings >>= flip evalAndPrint expr
+runOne :: [String] -> IO ()
+runOne args = do
+  env <- primitiveBindings >>= flip bindVars [("args", List $ map String $ drop 1 args)]
+  eval env (List [Atom "load", String (head args)]) >>= hPrint stderr
 
 runRepl :: IO ()
 runRepl = primitiveBindings >>= until_ (== "quit") (readPrompt "Lisp>>> ") . evalAndPrint
@@ -43,6 +53,4 @@ runRepl = primitiveBindings >>= until_ (== "quit") (readPrompt "Lisp>>> ") . eva
 main :: IO ()
 main = do
   args <- getArgs
-  case length args of
-    0 -> runRepl
-    _ -> runOne $ unwords args
+  if null args then runRepl else runOne args

@@ -66,6 +66,7 @@ executable scheme-test
                       , Types
                       , Functions
                       , IOFunctions
+                      , BuiltInFunctions
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:

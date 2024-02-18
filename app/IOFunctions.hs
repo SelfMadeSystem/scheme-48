@@ -1,15 +1,9 @@
-module IOFunctions (ioPrimitives) where
+module IOFunctions (ioPrimitives, load) where
 
 import Data.Functor
-import Evaluator (apply)
 import Lexer (readExpr, readExprList)
 import System.IO
 import Types hiding (body, closure, params, vararg)
-
-applyProc :: [LispVal] -> IO LispVal
-applyProc [func, List args] = apply func args
-applyProc (func : args) = apply func args
-applyProc args = return $ Error $ NumArgs 2 args
 
 makePort :: IOMode -> [LispVal] -> IO LispVal
 makePort mode [String filename] = Port <$> openFile filename mode
@@ -47,8 +41,7 @@ readAll badArgList = return $ Error $ NumArgs 1 badArgList
 
 ioPrimitives :: [(String, [LispVal] -> IO LispVal)]
 ioPrimitives =
-  [ ("apply", applyProc),
-    ("open-input-file", makePort ReadMode),
+  [ ("open-input-file", makePort ReadMode),
     ("open-output-file", makePort WriteMode),
     ("close-input-port", closePort),
     ("close-output-port", closePort),
